@@ -71,6 +71,9 @@ class Application:
                     self.audio_stream = audio_stream
                     self.status = 2
 
+        if not path.isdir(self.savePath):
+            system("mkdir Videos")
+
 
     def choosePath(self):
         choice = filedialog.askdirectory()
