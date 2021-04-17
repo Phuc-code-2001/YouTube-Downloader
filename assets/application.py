@@ -1,13 +1,10 @@
-from assets.graphic import *
-from assets.loger import *
 from pytube import *
 from pytube.cli import on_progress
 from moviepy.editor import VideoFileClip, AudioFileClip
-from time import sleep
 from os import system, path
 from threading import Thread
-
-from tkinter.constants import END
+import webbrowser
+import time
 
 class Application:
     def __init__(self):
@@ -15,118 +12,99 @@ class Application:
         self.video = None
         self.video_stream = None
         self.audio_stream = None
+
         self.status = 0
         self.downloading = False
         self.download_stream = None
+
         self.UI = UI(self)
-        self.savePath = "./Videos"
+        self.savePath = "./videos"
         self.res = ('1080p', '720p', '480p', '360p')
         self.option = 0
+
         self.loger = Loger(self, "URL")
+        self.chromeDriver = None
 
     def check(self):
         url = self.UI.urlSearch.get()
-        self.clean()
+        self.UI.clean()
         try:
-            yt = YouTube(url, on_progress_callback=on_progress, on_complete_callback=self.complete)
+            yt = YouTube(url, on_progress_callback=on_progress)
             self.YTobject = yt
 
         except:
-            self.throwMessage(["Can't find URL!!!", "Please check url or network..."])
+            self.UI.print(["Can't find URL!!!", "Please check url or network..."])
             self.YTobject = None
 
-        if self.YTobject is not None:
+        if self.YTobject != None:
 
-            if not self.loger.include(url): self.loger.insert(url)
+            self.insert(url)
 
-            self.throwMessage(["Title: " + self.YTobject.title, "Channel: " + self.YTobject.author])
+            self.UI.print(["Title: " + self.YTobject.title, "Channel: " + self.YTobject.author])
 
             self.option = self.UI.optionVar.get()
 
             if self.option == 4:
                 self.video = self.YTobject.streams.filter(only_audio=True).first()
-                self.throwMessage(["Only audio ... OK", "File size : " + str(round(self.video.filesize / 1048576, 2)) + "MB"\
-                    , "Ready to download!!!"])
+                self.UI.print(["Only audio...OK", f"File size : {round(self.video.filesize / 1048576, 2)}MB", "Ready to download!!!"])
                 self.status = 1
-                return 0
 
-            video_stream = None
-            audio_stream = None
-            full_stream = self.YTobject.streams.filter(res=self.res[self.option], progressive=True).first()
-            if full_stream is not None:
-                self.video = full_stream
-                self.throwMessage(["File size : " + str(round(full_stream.filesize / 1048576, 2)) + "MB"\
-                    , "Resolusion " + self.res[self.option] + "...OK", "Audio ... OK", "(1) file. Ready to download!!!"])
-                self.status = 1
             else:
-                video_stream = self.YTobject.streams.filter(res=self.res[self.option]).first()
-                if video_stream is None:
-                    self.throwMessage(["Not found the resolusion " + self.res[self.option], "Please choose others...!!!"])
+                full_stream = self.YTobject.streams.filter(res=self.res[self.option], progressive=True).first()
+                if full_stream != None:
+                    self.video = full_stream
+                    self.UI.print([f"Resolusion {self.res[self.option]}...OK", "Audio ... OK", f"File size : {round(full_stream.filesize / 1048576, 2)}MB", "(1) file. Ready to download!!!"])
+                    self.status = 1
                 else:
+                    self.video = None
+                    video_stream = self.YTobject.streams.filter(res=self.res[self.option]).first()
                     audio_stream = self.YTobject.streams.filter(only_audio=True).first()
-                    self.throwMessage([f"Resolusion {self.res[self.option]} ...OK", "Audio ... OK", "Total size : " + \
-                         str(round((audio_stream.filesize + video_stream.filesize) / 1048576, 2)) + "MB" \
-                             , "(2) files. Ready to merge download !!!"])
-                    self.video_stream = video_stream
-                    self.audio_stream = audio_stream
-                    self.status = 2
 
-        if not path.isdir(self.savePath):
-            system("mkdir Videos")
-
-
-    def choosePath(self):
-        choice = filedialog.askdirectory()
-        if len(choice) != 0:
-            self.savePath = choice
-            self.UI.pathLabel.config(text=self.savePath)
-        
-    def complete(self):
-        self.clean()
-        self.throwMessage(["Download Done...!!!"])
+                    if video_stream is None:
+                        self.UI.print(["Not found the resolusion " + self.res[self.option], "Please choose others...!!!"])
+                    else:
+                        self.UI.print([f"Resolusion {self.res[self.option]} ...OK", "Audio ... OK", f"Total size : {round((audio_stream.filesize + video_stream.filesize) / 1048576, 2)}MB", "(2) files. Ready to merge download !!!"])
+                        self.video_stream = video_stream
+                        self.audio_stream = audio_stream
+                        self.status = 2
 
     def download_callback(self):
         if self.downloading:
-            self.clean()
-            self.throwMessage(["Downloading. Please wait..."])
+            self.UI.clean()
+            self.UI.print(["Downloading", f"Video: {self.YTobject.title}", "Please wait..."])
         else:
             self.download_stream = Thread(target=lambda: self.download())
             self.download_stream.start()
 
     def download(self):
-
+        self.downloading = True
         if self.status == 1:
-            self.downloading = True
-            
             if self.option == 4:
                 if path.isfile("audio_file.mp4"): system(f"del \"audio_file.mp4\"")
                 self.video.download(filename="audio_file")
                 self.audioConvert("audio_file.mp4")
-                self.clean()
-                self.throwMessage(["Convert audio: Done...", "Download Successfully...!!!"])
+                self.UI.clean()
+                self.UI.print(["Convert audio: Done...", "Download Successfully...!!!"])
             else:
                 self.video.download(output_path=self.savePath)
-
-
-            self.status = 0
-            self.video = None
-            self.downloading = False
+                self.UI.clean()
+                self.UI.print(["Downloaded Succesfully..."])
 
         elif self.status == 2:
-            self.downloading = True
-
             self.merge_download()
-            self.downloading = False
-            self.status = 0
-            self.video = None
+
         else:
-            self.clean()
-            self.throwMessage(["Download not ready...", "Please check URL !!!"])
-            self.download_stream = None
+            self.UI.clean()
+            self.UI.print(["Download not ready...", "Please check URL !!!"])
+
+        self.status = 0
+        self.video = None
+        self.downloading = False
+        self.download_stream = None
 
     def audioConvert(self, audname):
         audioFile = AudioFileClip(audname)
-        name = self.YTobject.title
+        name = self.format(self.YTobject.title)
         expand = ".mp3"
         temp = "Undefined"
         audioFile.write_audiofile(temp + expand)
@@ -138,9 +116,9 @@ class Application:
 
     def merge_download(self):
         
-        system("del audio_file.mp4")
-        system("del video_file.mp4")
-        system("del *wvf_snd.mp3")
+        if path.isfile("audio_file.mp4"): system("del audio_file.mp4")
+        if path.isfile("video_file.mp4"): system("del video_file.mp4")
+        if path.isfile("*wvf_snd.mp3"): system("del *wvf_snd.mp3")
 
         self.audio_stream.download(filename="audio_file")
         self.video_stream.download(filename="video_file")
@@ -148,7 +126,6 @@ class Application:
         self.combine_audio("video_file.mp4", "audio_file.mp4")
         system("del audio_file.mp4")
         system("del video_file.mp4")
-        self.throwMessage(["Clear cache successfully!!!"])
         
         self.video_stream = None
         self.audio_stream = None
@@ -161,37 +138,89 @@ class Application:
 
         tempName = "Undefined"
         expand = ".mp4"
-        name = self.YTobject.title
+        name = self.format(self.YTobject.title)
         final_clip.write_videofile(tempName + expand)
 
         system(f"ren \"{tempName + expand}\" \"{name + expand}\"")
         system(f"move \"{name + expand}\" \"{self.savePath}\"")
 
-        self.clean()
-        self.throwMessage(["Combine successfully...Done!!!"])
+        self.UI.clean()
+        self.UI.print(["Combine successfully...Done!!!"])
 
     def openCurrentFolder(self):
         currentFolder = self.savePath.replace('/', '\\')
         system(f"explorer \"{currentFolder}\"")
 
-    def clean(self):
-        self.UI.board.delete(0, END)
+    def openYouTube(self):
+        #check Google chrome
+        
+        if self.chromeDriver is None:
+            if path.isfile("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"):
+                self.chromeDriver = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+            elif path.isfile("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"):
+                self.chromeDriver = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+        
+        if self.chromeDriver != None:
+            webbrowser.register("chrome", None, webbrowser.BackgroundBrowser(self.chromeDriver))
+            webbrowser.get('chrome').open("https://youtube.com")
+        else:
+            self.UI.print(["Can't find Google Chrome", "Please install Google Chrome to use this function!!!"])
 
-    def reset(self):
-        self.UI.urlSearch.delete(0, END)
-        self.clean()
-        system("cls")
+    def format(self, name):
+        target = ""
+        for r in name:
+            if r in ['\\', '/', ':','*', '?', '"', '<', '>', '|']:
+                target += '_'
+            else:
+                target += r
+        return target
 
-    def throwMessage(self, args):
-        for message in args:
-            self.UI.board.insert(END, message)
+    def load(self):
+        self.loger.load()
+        self.UI.load(self.loger.box)
+    
+    def insert(self, url):
+        if self.loger.include(url):
+            ...
+        else:
+            self.loger.insert(url)
+            self.UI.insert(url)
+    
+    def clearURL(self):
+        if askokcancel("Clear", "Do you really to clear all URLs in history?"):
+            self.loger.clear()
+            self.UI.clearURL()
+
+    def setDefaultSavePath(self):
+        if path.isdir(self.savePath):
+            ...
+        else:
+            system(f"mkdir \"{self.savePath}\"")
+
+        # self.savePath = path._getfullpathname(self.savePath)
+        # self.UI.pathLabel.config(text=self.savePath)
+        
 
     def play(self):
         self.UI.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.loger.load()
+        self.load()
+        self.setDefaultSavePath()
         self.UI.mainloop()
 
     def on_closing(self):
-        if self.download_stream:
-            self.download_stream.join()
-        self.UI.destroy()
+        if self.download_stream != None:
+            _exit = askyesno("Exit", f"You are downloading {self.YTobject.title}, \nDo you want to quit anyway?")
+            if _exit:
+                self.download_stream.join()
+                self.UI.destroy()
+        else:
+            self.UI.destroy()
+
+if __name__ == "__main__":
+    from graphic import *
+    from loger import *
+    app = Application()
+    app.play()
+else:
+    from assets.graphic import *
+    from assets.loger import *
