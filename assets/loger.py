@@ -1,5 +1,4 @@
-from os import path
-from tkinter.constants import END
+from os import path, system
 
 class Loger:
     def __init__(self, app, filename):
@@ -11,17 +10,14 @@ class Loger:
         if path.isfile(self.filename):
             with open(self.filename, 'r') as reader:
                 for url in reader.read().split('\n'):
-                    self.box.append(url)
-                    self.app.UI.urlBefore.insert(END, url)
+                    self.box.append(url.replace("\"", ""))
     
     def insert(self, url):
-        system(f"echo {url} >> \"{self.filename}\"")
+        system(f"echo \"{url}\" >> \"{self.filename}\"")
         self.box.append(url)
-        self.app.UI.urlBefore.insert(END, url)
     
     def clear(self):
-        system(f"del \"{self.filename}\"")
-        self.app.UI.urlBefore.delete(0, END)
+        if path.isfile(self.filename): system(f"del \"{self.filename}\"")
         self.box.clear()
 
     def include(self, url):
