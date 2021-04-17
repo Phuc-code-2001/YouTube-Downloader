@@ -1,6 +1,5 @@
-from assets.application import Application
+from assets.application import *
 
 
 app = Application()
 app.play()
-
