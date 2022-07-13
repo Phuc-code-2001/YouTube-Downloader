@@ -1,2 +1,2 @@
 # YouTube-Downloader
-This application allowed user download video from youtube...
++ This application allowed user download video from youtube
